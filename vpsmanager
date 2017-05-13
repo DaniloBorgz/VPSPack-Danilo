@@ -18,7 +18,7 @@ else
 	fi
 fi
 clear
-echo -e "     \033[40;1;37m  VpsManager by Luan  \033[0m"
+echo -e "     \033[40;1;37m  VpsManager by AnonymousSTR  \033[0m"
 echo -e "\033[1;37mEscolha uma das opções:    \033[1;37mPara Sair Ctrl + C\033[1;33m 
 [1] Attrepo \033[1;0m(Atualizar repositorio do Vpsmanager )\033[1;33m
 [2] Attssh \033[1;0m(Atualizar configurações Ssh )\033[1;33m
