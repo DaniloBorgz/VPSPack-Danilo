@@ -1,0 +1,108 @@
+#!/bin/bash
+
+rm -rf /var/www/html
+apt-get install build-essential apache2 apache2-utils git -y
+
+echo "# If you just change the port or add more ports here, you will likely also
+# have to change the VirtualHost statement in
+# /etc/apache2/sites-enabled/000-default.conf
+
+Listen 8080
+
+<IfModule ssl_module>
+	Listen 443
+</IfModule>
+
+<IfModule mod_gnutls.c>
+	Listen 443
+</IfModule>
+
+# vim: syntax=apache ts=4 sw=4 sts=4 sr noet" > /etc/apache2/ports.conf
+
+mkdir /var/www/html/
+cd /var/www/html/
+git clone https://github.com/darold/squidanalyzer.git
+mv squidanalyzer squidanalyzer-sources
+cd squidanalyzer-sources
+perl Makefile.PL \
+     LOGFILE=/var/log/squid3/access.log \
+     BINDIR=/usr/bin \
+     CONFDIR=/etc/squidanalyzer \
+     HTMLDIR=/var/www/html/squidanalyzer \
+     BASEURL=/ \
+     MANDIR=/usr/man/man3 \
+     DOCDIR=/usr/share/doc/squidanalyzer
+     
+make && make install
+
+cp -Rfa /var/www/html/squidanalyzer-sources/resources/images/* /var/www/html/squidanalyzer/images/
+
+echo 'Output	/var/www/html/squidanalyzer
+WebUrl	/
+LogFile	/var/log/squid3/access.log
+UseClientDNSName	0
+DNSLookupTimeout	0.0001
+NetworkAlias	/etc/squidanalyzer/network-aliases
+UserAlias	/etc/squidanalyzer/user-aliases
+OrderNetwork	bytes
+OrderUser	bytes
+OrderUrl	bytes
+OrderMime	bytes
+UrlReport	1
+UrlHitsOnly	0
+UserReport	1
+QuietMode	1
+CostPrice	0
+Currency	&euro;
+TopNumber	100
+TopStorage	0
+Exclude	/etc/squidanalyzer/excluded
+Include	/etc/squidanalyzer/included
+Lang	/etc/squidanalyzer/lang/pt_BR.txt
+DateFormat	%d-%m-%y
+AnonymizeLogin	0
+SiblingHit	1
+TransfertUnit	MB
+MinPie		2
+Locale		pt_BR
+WriteDelay	3600
+TopUrlUser	10
+#CustomHeader	<a href="http://my.isp.dom/"><img src="http://my.isp.dom/logo.png" title="My ISP link" border="0" width="100" height="110"></a> My ISP Company
+#ExcludedMethods	HEAD
+#ExcludedMimes	text/.*,image/.*
+#ExcludedCodes	TCP_DENIED/403
+#MaxFormatError	0
+TimeZone	-03
+#UseUrlPort	0
+#TimeStart	00:00
+#TimeStop	23:59' > /etc/squidanalyzer/squidanalyzer.conf
+
+echo '<VirtualHost *:8080>
+  ServerName luan-ssh
+  ServerAdmin luanbissoli@gmail.com
+  DocumentRoot "/var/www/squidanalyzer"
+   <Directory "/var/www/squidanalyzer">
+     Options +FollowSymLinks +FollowSymLinks +MultiViews
+     AllowOverride All
+     AuthUserFile /etc/apache2/access/squidanalyzer-htpasswd
+     AuthName "SquidAnalyzer"
+     AuthType Basic
+     require valid-user
+   </Directory>
+  ServerSignature Off
+  LogLevel info
+  ErrorLog /var/log/apache2/squidanalyzer-error.log
+  CustomLog /var/log/apache2/squidanalyzer-access.log combined
+</VirtualHost>' > /etc/apache2/sites-available/squidanalyzer.conf
+
+rm -rf /etc/apache2/access/
+mkdir /etc/apache2/access/
+htpasswd -s -c /etc/apache2/access/squidanalyzer-htpasswd squidanalyzer
+a2dissite 000-default
+a2ensite squidanalyzer.conf
+
+echo "0 */10     *       *       *    /usr/bin/squid-analyzer > /dev/null 2>&1" >> /var/spool/cron/crontabs/root
+
+/usr/bin/squid-analyzer > /dev/null 2>&1
+mv /var/www/html/squidanalyzer /var/www/squidanalyzer
+/etc/init.d/apache2 restart
